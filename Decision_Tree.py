@@ -2,7 +2,7 @@ import numpy as np
 import collections
 from anytree import Node, RenderTree
 import pandas as pd 
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier,RandomForestClassifier
 import matplotlib.pyplot as plt
 
 #computes entropy at a given node
@@ -201,89 +201,82 @@ def decision_tree(que_part, train_file, test_file, validation_file):
         features,labels = get_data(test_file)  
         acc = get_accuracy(features,labels,root,que_part)
         print(acc)
-def part_d(train_file, test_file, val_file):
-    print("Inside part D")
+
+def get_acc_using_params(flag,params,train_features,train_labels,val_features,val_labels):
     
-    train_features,train_labels=get_data(train_file)
-    test_features,test_labels=get_data(test_file)
-    val_features,val_labels=get_data(val_file)
-    
-    dt = DecisionTreeClassifier(criterion="entropy", random_state=0)
+    if(flag == 0):
+        dt = DecisionTreeClassifier(criterion=params[0],random_state=params[1])
+    if(flag == 1):
+        dt = DecisionTreeClassifier(criterion=params[0],max_depth=params[2],random_state=params[1])
+    elif(flag == 2):
+        dt = DecisionTreeClassifier(criterion=params[0],min_samples_split=params[2],random_state=params[1])
+    elif(flag == 3):
+        dt = DecisionTreeClassifier(criterion=params[0],min_samples_leaf=params[2],random_state=params[1])
     dt.fit(train_features,train_labels)
-    
     val_accuracy = dt.score(val_features,val_labels)
+    return val_accuracy
+
+def plot_acc(x_vals, accuracy):
+    max_acc=max(accuracy)
+    plt.plot(x_vals, accuracy)
+    
+    plt.legend(['Max Accuracy: %.1f' % max_acc])
+    plt.ylabel('Accuracy-->')
+    plt.xlabel('parameter------>')
+    
+    plt.show()
+    plt.close()
+
+def part_d(train_file, test_file, val_file):
+    
+    train_features,train_labels = get_data(train_file)
+    val_features,val_labels = get_data(val_file)
+    params = ["entropy", 0]
+    val_accuracy = get_acc_using_params(0,params,train_features,train_labels,val_features,val_labels)
 
     print("Validation set Accuracy:",val_accuracy*100)
-    print("Height:", dt.tree_.max_depth)
-    print("Node count:", dt.tree_.node_count)
-
-    print("plotting validation accurancy with max_depth")
-    depths=range(1,30)
+   
+    print("1.varying max_depth ....")
+    depths = range(1,23)
     accuracy=[]
     for d in depths:
-        dt = DecisionTreeClassifier(criterion="entropy",max_depth=d, random_state=0)
-        dt.fit(train_features,train_labels)
-        val_accuracy = dt.score(val_features,val_labels)
+        params = ["entropy", 0, d]
+        val_accuracy = get_acc_using_params(1,params,train_features,train_labels,val_features,val_labels)
         accuracy.append(val_accuracy*100)
-        
-    plt.plot(depths, accuracy)
-    max_acc=max(accuracy)
-    plt.legend(
-    [
-     'Max Acc: %.1f' % max_acc
-    ]
-    )
-    plt.ylabel('Accuracy')
-    plt.xlabel('Max_Depth')
+    plot_acc(depths, accuracy)
     
-    plt.show()
-    plt.close()
-    
-    print("plotting validation accurancy with min_samples_split")
-    min_samples_split_sizes=list(range(10, 300, 10))
+    print("2.Varying min_samples_split")
+    split_sizes=list(range(10, 300, 10))
     accuracy=[]
-    for x in min_samples_split_sizes:
-        dt = DecisionTreeClassifier(criterion="entropy",min_samples_split=x, random_state=0)
-        dt.fit(train_features,train_labels)
-        val_accuracy = dt.score(val_features,val_labels)
+    for x in split_sizes:
+        params = ["entropy",0,x]
+        val_accuracy = get_acc_using_params(2,params,train_features,train_labels,val_features,val_labels)
         accuracy.append(val_accuracy*100)
-        
-    plt.plot(min_samples_split_sizes, accuracy)
-    max_acc=max(accuracy)
-    plt.legend(
-    [
-     'Max Acc: %.1f' % max_acc
-    ]
-    )
-    plt.ylabel('Accuracy')
-    plt.xlabel('min_samples_split')
+    plot_acc(split_sizes, accuracy)
     
-    plt.show()
-    plt.close()
-    
-    print("plotting validation accurancy with min_samples_leaf")
-    min_samples_leaf_sizes=list(range(10, 300, 10))
+    print("3.Varying min_samples_leaf")
+    leaf_sizes=list(range(10, 300, 10))
     accuracy=[]
-    for x in min_samples_leaf_sizes:
-        dt = DecisionTreeClassifier(criterion="entropy",min_samples_leaf=x, random_state=0)
-        dt.fit(train_features,train_labels)
-        val_accuracy = dt.score(val_features,val_labels)
+    for x in leaf_sizes:
+        params = ["entropy",0,x]
+        val_accuracy = get_acc_using_params(3,params,train_features,train_labels,val_features,val_labels)
         accuracy.append(val_accuracy*100)
         
-    plt.plot(min_samples_leaf_sizes, accuracy)
-    max_acc=max(accuracy)
-    plt.legend(
-    [
-     'Max Acc: %.1f' % max_acc
-    ]
-    )
-    plt.ylabel('Accuracy')
-    plt.xlabel('min_samples_leaf')
-    
-    plt.show()
-    plt.close()
+    plot_acc(leaf_sizes, accuracy)
+#def part_e():
 
+
+def part_f(train_file, test_file, val_file):
+    train_features,train_labels = get_data(train_file)
+    val_features,val_labels = get_data(val_file)
+    
+    rf = RandomForestClassifier(criterion="entropy",random_state=0)
+    rf.fit(train_features,train_labels)
+   
+    acc = rf.score(val_features,val_labels)
+    print("Validation set Accuracy:",acc*100)
 #decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
 part_d("../credit-cards.train.csv","../credit-cards.train.csv","../credit-cards.val.csv")
+
 
 
