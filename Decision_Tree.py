@@ -2,8 +2,24 @@ import numpy as np
 import collections
 from anytree import Node, RenderTree
 import pandas as pd 
-from sklearn.tree import DecisionTreeClassifier,RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
+import queue
+
+#one hot encoder
+def one_hot_encoder(features,cols,col_values):
+    cols_to_be_left = list(set(range(features.shape[1])) - set(cols))
+    features_processed = features[:, cols_to_be_left]
+    count_rows = features.shape[0]
+    for col, values in zip(cols, col_values):
+        val_to_int = {val: idx for idx, val in enumerate(values)}
+        new_cols = np.zeros((count_rows, len(values)))
+        for row in range(count_rows):
+            value = features[row, col]
+            new_cols[row, val_to_int[value]] = 1
+        features_processed = np.hstack((features_processed, new_cols))
+    return features_processed
 
 #computes entropy at a given node
 def compute_entropy(labels):
@@ -86,12 +102,23 @@ def preprocess_data(data_file):
 class NodeType:
 
     node_count = 0
+    node_list = []
     def __init__(self, data, majority):
         self.data = data
         self.majority = majority
         self.children = None
         self.median = None
         NodeType.node_count += 1
+    
+    def BFS_traversal(self):
+        nodes = queue.Queue(NodeType.node_count)
+        NodeType.node_list = []
+        nodes.put(self)
+        while(not nodes.empty()):
+            node = nodes.get()
+            for child in node.children.values():
+                nodes.put(child)
+            NodeType.node_list.append(node)
 
     def Print(self,tree_node):
         print(self.data)
@@ -227,10 +254,40 @@ def plot_acc(x_vals, accuracy):
     plt.show()
     plt.close()
 
-def part_d(train_file, test_file, val_file):
+def tree_pruning(list_nodes,features,labels,root,que_part):
+    prev_acc = get_accuracy(features,labels,root,que_part)
+    iter = 0
+    while(iter <= 10000):
+        accuracies = []
+        for node in list_nodes:
+            temp_child = node.children
+            node.children = {}
+            accuracies.append(get_accuracy(features,labels,root,que_part))
+            node.children = temp_child
+            
+        next_acc = max(accuracies)
+        node_to_prune = list_nodes[accuracies.index(next_acc)]
+        if((next_acc - prev_acc) < 1e-2):
+            break
+        prev_acc = next_acc
+        node_to_prune.children = {}
+        iter += 1
+    return prev_acc
+
+def part_b(train_file, test_file):
+    features,labels = preprocess_data(train_file)          
+    root = grow_tree(set(range(23)), features, labels, 'a')
+    root.BFS_traversal()
+    list_nodes = NodeType.node_list
     
-    train_features,train_labels = get_data(train_file)
-    val_features,val_labels = get_data(val_file)
+    features,labels = preprocess_data(test_file)  
+    acc = tree_pruning(list_nodes,features,labels,root,'a')
+    print(acc)
+
+
+def part_d(train_features,train_labels, val_features,val_labels):
+    # train_features,train_labels = get_data(train_file)
+    # val_features,val_labels = get_data(val_file)
     params = ["entropy", 0]
     val_accuracy = get_acc_using_params(0,params,train_features,train_labels,val_features,val_labels)
 
@@ -246,7 +303,7 @@ def part_d(train_file, test_file, val_file):
     plot_acc(depths, accuracy)
     
     print("2.Varying min_samples_split")
-    split_sizes=list(range(10, 300, 10))
+    split_sizes=list(range(10, 200, 10))
     accuracy=[]
     for x in split_sizes:
         params = ["entropy",0,x]
@@ -255,7 +312,7 @@ def part_d(train_file, test_file, val_file):
     plot_acc(split_sizes, accuracy)
     
     print("3.Varying min_samples_leaf")
-    leaf_sizes=list(range(10, 300, 10))
+    leaf_sizes=list(range(10, 250, 10))
     accuracy=[]
     for x in leaf_sizes:
         params = ["entropy",0,x]
@@ -263,20 +320,40 @@ def part_d(train_file, test_file, val_file):
         accuracy.append(val_accuracy*100)
         
     plot_acc(leaf_sizes, accuracy)
-#def part_e():
 
+def part_e(train_file, test_file, val_file):
+    train_features,train_labels = get_data(train_file)
+    val_features,val_labels = get_data(val_file)
+    cols = [1,2,3,5,6,7,8,9,10]
+    col_vals = [[1, 2],[0, 1, 2, 3, 4, 5, 6],[0, 1, 2, 3],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+    train_features = one_hot_encoder(train_features,cols,col_vals)
+    val_features = one_hot_encoder(val_features,cols,col_vals)
+    part_d(train_features,train_labels, val_features,val_labels)
 
 def part_f(train_file, test_file, val_file):
     train_features,train_labels = get_data(train_file)
     val_features,val_labels = get_data(val_file)
-    
+    cols = [1,2,3,5,6,7,8,9,10]
+    col_vals = [[1, 2],[0, 1, 2, 3, 4, 5, 6],[0, 1, 2, 3],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+    train_features = one_hot_encoder(train_features,cols,col_vals)
+    val_features = one_hot_encoder(val_features,cols,col_vals)
+
     rf = RandomForestClassifier(criterion="entropy",random_state=0)
     rf.fit(train_features,train_labels)
    
     acc = rf.score(val_features,val_labels)
     print("Validation set Accuracy:",acc*100)
-#decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
-part_d("../credit-cards.train.csv","../credit-cards.train.csv","../credit-cards.val.csv")
+decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
+
+train_features,train_labels = get_data("../credit-cards.train.csv")
+val_features,val_labels = get_data("../credit-cards.val.csv")
+part_d(train_features,train_labels, val_features,val_labels)
 
 
 

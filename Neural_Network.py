@@ -129,7 +129,6 @@ def mean_sq_error(labels, predictions):
     error_vector = np.sum(sq_diff,axis=1)/2
     error = np.mean(error_vector)
     return error
-    
 
 def train_per_batch(layers, features, labels, activation_fn, learning_rate):
     
