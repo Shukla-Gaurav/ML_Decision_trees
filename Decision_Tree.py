@@ -21,6 +21,15 @@ def one_hot_encoder(features,cols,col_values):
         features_processed = np.hstack((features_processed, new_cols))
     return features_processed
 
+def plot_graph(x_vals, y_vals):
+    axes = plt.gca()
+    plt.xlabel('X --->')
+    plt.ylabel('Y --->')
+    #plt.axis([-3, 5, 0.985, 1.01])
+    plt.plot(x_vals, y_vals, 'r-',label = "Plot")
+    plt.legend(loc="upper right")
+    plt.show()
+
 #computes entropy at a given node
 def compute_entropy(labels):
     elem_freq = collections.Counter(labels)
