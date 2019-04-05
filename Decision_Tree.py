@@ -63,7 +63,7 @@ def partition_data(features, labels, feature_no):
         features_set.append(features[np.where(feature > median)])
         labels_set.append(labels[np.where(feature <= median)])
         labels_set.append(labels[np.where(feature > median)])
-    return attr_vals = median,features_set,labels_set
+    return median,features_set,labels_set
 
 #convert continuous data into binary data
 def preprocess_continuous_attr(features, feature_no):
@@ -86,6 +86,7 @@ def get_training_data(data_file):
     training_data = np.array(data.values[1:,1:]).astype(int)
     features = training_data[:,:-1]
     labels = training_data[:,-1]
+    print(features.shape,labels.shape)
     return features, labels
 
 #preprocess continuous attributes    
@@ -163,8 +164,12 @@ def grow_tree(attr_set, features, labels, que_part):
     node.children = {}
     
     #partition based on the best feature column
-    if(que_part == 'c' and (max_gain_feature not in binary_attr)):
+    if(que_part == 'c' and (max_gain_feature in continuous_attr)):
         median,features_set,labels_set = partition_data(features, labels, max_gain_feature)
+        #if median is dominating with high frequency
+        if not (features_set[1].any()):
+            return NodeType(None,majority)
+
         node.median = median
         attr_vals = [0,1]
     elif(que_part == 'c'):
@@ -179,14 +184,14 @@ def grow_tree(attr_set, features, labels, que_part):
         
     return node
 
-def get_accuracy(features,label,root,que_part):
+def get_accuracy(features,labels,root,que_part):
     output = []
     for row in features:
         node = root
         while node.children:
             attr = node.data
             attrval = row[attr]
-            if (attr not in binary_attr) and que_part == 'c':
+            if (attr in continuous_attr) and que_part == 'c':
                 if attrval <= node.median:
                     node = node.children[0]
                 else:
@@ -202,25 +207,25 @@ def get_accuracy(features,label,root,que_part):
 
 def decision_tree(que_part, train_file, test_file, validation_file):
     if(que_part == 'a'):
-        features,labels = preprocess_data(train_file)             
+        features,labels = preprocess_data(train_file)          
         root = grow_tree(set(range(23)), features, labels, que_part)
         #for graphical view
-        tree_node = Node(str(root.data))
+        #tree_node = Node(str(root.data))
         #print(root.Print(tree_node))
         #get Accuracy
         features,labels = preprocess_data(test_file)  
-        acc = get_accuracy(features,label,root,que_part)
+        acc = get_accuracy(features,labels,root,que_part)
         print(acc)
     elif(que_part == 'c'):
         features,labels = get_training_data(train_file)             
         root = grow_tree(set(range(23)), features, labels, que_part)
-        tree_node = Node(str(root.data))
+        #tree_node = Node(str(root.data))
         #for graphical view
-        tree_node = Node(str(root.data))
+        #tree_node = Node(str(root.data))
         #print(root.Print(tree_node))
         #get Accuracy
         features,labels = get_training_data(test_file)  
-        acc = get_accuracy(features,label,root,que_part)
+        acc = get_accuracy(features,labels,root,que_part)
         print(acc)
-
+decision_tree('c',"../credit-cards.train.csv","../credit-cards.test.csv","../test.csv")
 
