@@ -2,6 +2,8 @@ import numpy as np
 import collections
 from anytree import Node, RenderTree
 import pandas as pd 
+from sklearn.tree import DecisionTreeClassifier
+import matplotlib.pyplot as plt
 
 #computes entropy at a given node
 def compute_entropy(labels):
@@ -15,8 +17,6 @@ def compute_entropy(labels):
   
 #information gain wrt given attribute (feature_no)
 def info_gain(H_parent, features, labels, feature_no):
-    #arr = np.array(["weak","strong","weak","strong","mild","mild","weak","strong","mild","strong","strong","weak"])
-    #labels = np.array([1,0,1,0,0,0,1,1,1,0,1,1])
     feature = features[:,feature_no]
     elem_freq = collections.Counter(feature)
     attr_vals = list(elem_freq)
@@ -49,39 +49,23 @@ def partition_data(features, labels, feature_no):
     #print(feature)
     median = np.median(feature)
 
-    #check if only 2 values are there in continuous data
-    elem_freq = collections.Counter(feature)
-    attr_vals = np.array(list(elem_freq))
-    if(attr_vals.size == 2):
-        attr_vals = np.sort(attr_vals)
-        features_set = [features[np.where(feature == val),:][0] for val in attr_vals]
-        labels_set = [labels[np.where(feature == val)] for val in attr_vals]
-    else:
-        features_set = []
-        labels_set = []
-        features_set.append(features[np.where(feature <= median)])
-        features_set.append(features[np.where(feature > median)])
-        labels_set.append(labels[np.where(feature <= median)])
-        labels_set.append(labels[np.where(feature > median)])
+    features_set = []
+    labels_set = []
+    features_set.append(features[np.where(feature <= median)])
+    features_set.append(features[np.where(feature > median)])
+    labels_set.append(labels[np.where(feature <= median)])
+    labels_set.append(labels[np.where(feature > median)])
     return median,features_set,labels_set
 
 #convert continuous data into binary data
 def preprocess_continuous_attr(features, feature_no):
     feature = features[:, feature_no].astype(int)
-    #check if it has only two values
-    elem_freq = collections.Counter(feature)
-    attr_vals = list(elem_freq)
-
-    #check if only 2 values are there in continuous data
-    if(len(attr_vals) == 2):
-        val = attr_vals[0]
-        features[:, feature_no] = np.where(feature == val, 0, 1)
-    else:
-        median = np.median(feature)
-        features[:, feature_no] = np.where(feature <= median, 0, 1)
+    
+    median = np.median(feature)
+    features[:, feature_no] = np.where(feature <= median, 0, 1)
     return features
 
-def get_training_data(data_file):
+def get_data(data_file):
     data = pd.read_csv(data_file)
     training_data = np.array(data.values[1:,1:]).astype(int)
     features = training_data[:,:-1]
@@ -91,7 +75,7 @@ def get_training_data(data_file):
 
 #preprocess continuous attributes    
 def preprocess_data(data_file):
-    features, labels = get_training_data(data_file)
+    features, labels = get_data(data_file)
     #print(training_data)
     continuous_attr = {0, 4, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22}
     for feature_no in continuous_attr:
@@ -118,7 +102,6 @@ class NodeType:
                 self.children[child].Print(temp_tree_node)
     
 continuous_attr = {0, 4, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22}
-binary_attr = {1}
 
 #creating decision tree
 def grow_tree(attr_set, features, labels, que_part):
@@ -166,10 +149,6 @@ def grow_tree(attr_set, features, labels, que_part):
     #partition based on the best feature column
     if(que_part == 'c' and (max_gain_feature in continuous_attr)):
         median,features_set,labels_set = partition_data(features, labels, max_gain_feature)
-        #if median is dominating with high frequency
-        if not (features_set[1].any()):
-            return NodeType(None,majority)
-
         node.median = median
         attr_vals = [0,1]
     elif(que_part == 'c'):
@@ -217,15 +196,94 @@ def decision_tree(que_part, train_file, test_file, validation_file):
         acc = get_accuracy(features,labels,root,que_part)
         print(acc)
     elif(que_part == 'c'):
-        features,labels = get_training_data(train_file)             
+        features,labels = get_data(train_file)             
         root = grow_tree(set(range(23)), features, labels, que_part)
-        #tree_node = Node(str(root.data))
-        #for graphical view
-        #tree_node = Node(str(root.data))
-        #print(root.Print(tree_node))
-        #get Accuracy
-        features,labels = get_training_data(test_file)  
+        features,labels = get_data(test_file)  
         acc = get_accuracy(features,labels,root,que_part)
         print(acc)
-decision_tree('c',"../credit-cards.train.csv","../credit-cards.test.csv","../test.csv")
+def part_d(train_file, test_file, val_file):
+    print("Inside part D")
+    
+    train_features,train_labels=get_data(train_file)
+    test_features,test_labels=get_data(test_file)
+    val_features,val_labels=get_data(val_file)
+    
+    dt = DecisionTreeClassifier(criterion="entropy", random_state=0)
+    dt.fit(train_features,train_labels)
+    
+    val_accuracy = dt.score(val_features,val_labels)
+
+    print("Validation set Accuracy:",val_accuracy*100)
+    print("Height:", dt.tree_.max_depth)
+    print("Node count:", dt.tree_.node_count)
+
+    print("plotting validation accurancy with max_depth")
+    depths=range(1,30)
+    accuracy=[]
+    for d in depths:
+        dt = DecisionTreeClassifier(criterion="entropy",max_depth=d, random_state=0)
+        dt.fit(train_features,train_labels)
+        val_accuracy = dt.score(val_features,val_labels)
+        accuracy.append(val_accuracy*100)
+        
+    plt.plot(depths, accuracy)
+    max_acc=max(accuracy)
+    plt.legend(
+    [
+     'Max Acc: %.1f' % max_acc
+    ]
+    )
+    plt.ylabel('Accuracy')
+    plt.xlabel('Max_Depth')
+    
+    plt.show()
+    plt.close()
+    
+    print("plotting validation accurancy with min_samples_split")
+    min_samples_split_sizes=list(range(10, 300, 10))
+    accuracy=[]
+    for x in min_samples_split_sizes:
+        dt = DecisionTreeClassifier(criterion="entropy",min_samples_split=x, random_state=0)
+        dt.fit(train_features,train_labels)
+        val_accuracy = dt.score(val_features,val_labels)
+        accuracy.append(val_accuracy*100)
+        
+    plt.plot(min_samples_split_sizes, accuracy)
+    max_acc=max(accuracy)
+    plt.legend(
+    [
+     'Max Acc: %.1f' % max_acc
+    ]
+    )
+    plt.ylabel('Accuracy')
+    plt.xlabel('min_samples_split')
+    
+    plt.show()
+    plt.close()
+    
+    print("plotting validation accurancy with min_samples_leaf")
+    min_samples_leaf_sizes=list(range(10, 300, 10))
+    accuracy=[]
+    for x in min_samples_leaf_sizes:
+        dt = DecisionTreeClassifier(criterion="entropy",min_samples_leaf=x, random_state=0)
+        dt.fit(train_features,train_labels)
+        val_accuracy = dt.score(val_features,val_labels)
+        accuracy.append(val_accuracy*100)
+        
+    plt.plot(min_samples_leaf_sizes, accuracy)
+    max_acc=max(accuracy)
+    plt.legend(
+    [
+     'Max Acc: %.1f' % max_acc
+    ]
+    )
+    plt.ylabel('Accuracy')
+    plt.xlabel('min_samples_leaf')
+    
+    plt.show()
+    plt.close()
+
+#decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
+part_d("../credit-cards.train.csv","../credit-cards.train.csv","../credit-cards.val.csv")
+
 
