@@ -5,6 +5,7 @@ import collections
 import pickle
 import matplotlib.pyplot as plt
 import math
+from sklearn.utils import shuffle
 
 def get_data(data_file):
     data = pd.read_csv(data_file,header=None)
@@ -96,7 +97,7 @@ def get_derivative(z,activation_fn):
         
 def back_propagation(labels, predictions, last_layer, layers, learning_rate, activation_fn):
     batch_size = predictions.shape[0]
-    derv = get_derivative(predictions,activation_fn)
+    derv = np.multiply(predictions,1-predictions)
     delta_L = np.multiply(labels - predictions, derv)
     delta_w = delta_L.T @ layers[last_layer]["net_input"]
     updated_weights = layers[last_layer]["weights"] + learning_rate * delta_w/batch_size
@@ -182,6 +183,7 @@ def train(nodes_each_layer, batch_size, features, labels, num_epochs, activation
         if j % 10==0:
             features,labels = get_data("../train.csv")
             get_accuracy(layers, features, labels, "sigmoid")
+        features = shuffle(features)
     return layers
 
 def plot(errors):
@@ -194,8 +196,9 @@ def plot(errors):
     plt.show()
 
 features,labels = get_data("../train.csv")
+
 errors = []
-layers = train([20,10],100,features,labels,400,"sigmoid",1,"layers.pkl",errors)
+layers = train([5,10],100,features,labels,1000,"sigmoid",1,"layers.pkl",errors)
 
 plot(errors)
 

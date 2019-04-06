@@ -125,8 +125,9 @@ class NodeType:
         nodes.put(self)
         while(not nodes.empty()):
             node = nodes.get()
-            for child in node.children.values():
-                nodes.put(child)
+            if node.children:
+                for child in node.children.values():
+                    nodes.put(child)
             NodeType.node_list.append(node)
 
     def Print(self,tree_node):
@@ -248,6 +249,9 @@ def get_acc_using_params(flag,params,train_features,train_labels,val_features,va
         dt = DecisionTreeClassifier(criterion=params[0],min_samples_split=params[2],random_state=params[1])
     elif(flag == 3):
         dt = DecisionTreeClassifier(criterion=params[0],min_samples_leaf=params[2],random_state=params[1])
+    elif(flag == 4):
+        dt = DecisionTreeClassifier(criterion=params[0],min_samples_split = params[2], min_samples_leaf=params[3],random_state=params[1])
+
     dt.fit(train_features,train_labels)
     val_accuracy = dt.score(val_features,val_labels)
     return val_accuracy
@@ -297,38 +301,52 @@ def part_b(train_file, test_file):
 def part_d(train_features,train_labels, val_features,val_labels):
     # train_features,train_labels = get_data(train_file)
     # val_features,val_labels = get_data(val_file)
-    params = ["entropy", 0]
+    params = ["gini", 0]
     val_accuracy = get_acc_using_params(0,params,train_features,train_labels,val_features,val_labels)
 
     print("Validation set Accuracy:",val_accuracy*100)
    
     print("1.varying max_depth ....")
-    depths = range(1,23)
+    depths = list(range(1,50))
     accuracy=[]
     for d in depths:
-        params = ["entropy", 0, d]
+        params = ["gini", 0, d]
         val_accuracy = get_acc_using_params(1,params,train_features,train_labels,val_features,val_labels)
         accuracy.append(val_accuracy*100)
+        print("depth:",d)
     plot_acc(depths, accuracy)
     
     print("2.Varying min_samples_split")
-    split_sizes=list(range(10, 200, 10))
+    split_sizes=list(range(5, 200, 20))
     accuracy=[]
-    for x in split_sizes:
-        params = ["entropy",0,x]
+    for split in split_sizes:
+        params = ["gini",0,split]
         val_accuracy = get_acc_using_params(2,params,train_features,train_labels,val_features,val_labels)
         accuracy.append(val_accuracy*100)
+        print("split_size:",split)
     plot_acc(split_sizes, accuracy)
     
     print("3.Varying min_samples_leaf")
-    leaf_sizes=list(range(10, 250, 10))
+    leaf_sizes=list(range(10, 200, 5))
     accuracy=[]
-    for x in leaf_sizes:
-        params = ["entropy",0,x]
+    for leaf in leaf_sizes:
+        params = ["gini",0,leaf]
         val_accuracy = get_acc_using_params(3,params,train_features,train_labels,val_features,val_labels)
         accuracy.append(val_accuracy*100)
         
     plot_acc(leaf_sizes, accuracy)
+
+    print("4.Varying both min_samples_leaf and min_samples_split")
+    accuracy=[]
+    for split in split_sizes:
+         for leaf in leaf_sizes:
+            params = ["gini",0,split,leaf]
+            val_accuracy = get_acc_using_params(4,params,train_features,train_labels,val_features,val_labels)
+            accuracy.append(val_accuracy*100)
+            print("split,leaf:",split,",",leaf)
+    x_vals = list(range(len(accuracy)))    
+    plot_acc(x_vals, accuracy)
+
 
 def part_e(train_file, test_file, val_file):
     train_features,train_labels = get_data(train_file)
@@ -340,7 +358,11 @@ def part_e(train_file, test_file, val_file):
     [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
     train_features = one_hot_encoder(train_features,cols,col_vals)
     val_features = one_hot_encoder(val_features,cols,col_vals)
-    part_d(train_features,train_labels, val_features,val_labels)
+    for leaf in list(range(60,100,5)):
+        params = ["gini",0,leaf]
+        val_accuracy = get_acc_using_params(3,params,train_features,train_labels,val_features,val_labels)
+        print(leaf,":",val_accuracy*100)
+    #part_d(train_features,train_labels, val_features,val_labels)
 
 def part_f(train_file, test_file, val_file):
     train_features,train_labels = get_data(train_file)
@@ -358,11 +380,13 @@ def part_f(train_file, test_file, val_file):
    
     acc = rf.score(val_features,val_labels)
     print("Validation set Accuracy:",acc*100)
-decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
-
+#decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
+#part_b("../credit-cards.train.csv","../credit-cards.val.csv")
 train_features,train_labels = get_data("../credit-cards.train.csv")
 val_features,val_labels = get_data("../credit-cards.val.csv")
 part_d(train_features,train_labels, val_features,val_labels)
+#part_e("../credit-cards.train.csv","../credit-cards.test.csv","../credit-cards.val.csv")
+
 
 
 
