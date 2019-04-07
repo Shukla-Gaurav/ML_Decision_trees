@@ -200,7 +200,7 @@ def grow_tree(attr_set, features, labels, split_attr_dict,setting="median_fixed"
     #splitting features and recursively growing tree
     for i in range(len(attr_vals)):
         val = attr_vals[i]
-        node.children[val] = grow_tree(attr_set, features_set[i], labels_set[i],split_attr_dict,setting)
+        node.children[val] = grow_tree(attr_set, features_set[i], labels_set[i],split_attr_dict.copy(),setting)
         
     return node
 
@@ -225,6 +225,62 @@ def get_accuracy(features,labels,root,setting = "median_fixed"):
     correct_count = np.sum([predictions==labels])
     return (correct_count*100)/labels.size
 
+#-----------------------Plotting--------------------------------------------------------------
+
+def plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes):
+    plt.plot(total_nodes, train_accuracy, 'r', label = "Training Accuracy")
+    plt.plot(total_nodes, val_accuracy, 'y', label = "Validation Accuracy")
+    plt.plot(total_nodes, test_accuracy, 'b', label = "Test Accuracy")
+    plt.xlabel('No of Nodes---->')
+    plt.ylabel('Accuracies--->')
+    
+    plt.legend()
+    plt.show()
+    plt.savefig('part_b.png')
+
+def plot_as_tree_grows(train_features,train_labels,test_features,test_labels,
+                    val_features,val_labels,root):
+    
+    val_acc = get_accuracy(val_features,val_labels,root)
+    train_acc = get_accuracy(train_features,train_labels,root)
+    test_acc = get_accuracy(test_features,test_labels,root)
+
+    root.BFS_traversal()
+    list_nodes = NodeType.node_list[::-1]
+    
+    node_count = NodeType.node_count
+    #plotting parameters
+    train_accuracy = [train_acc]
+    val_accuracy = [val_acc]
+    test_accuracy = [test_acc]
+    total_nodes = [node_count]
+
+    nodes_deleted = 0
+    for node in list_nodes:
+        
+        if node.children:
+            nodes_deleted += len(node.children)
+        node.children = {}
+
+        #if 200 nodes deleted add accuracies
+        if(nodes_deleted >= 200):
+            node_count = node_count - nodes_deleted
+            total_nodes.append(node_count)
+            val_accuracy.append(get_accuracy(val_features,val_labels,root))
+            train_accuracy.append(get_accuracy(train_features,train_labels,root))
+            test_accuracy.append(get_accuracy(test_features,test_labels,root))
+
+            #reset no of nodes deleted
+            nodes_deleted = 0
+
+    total_nodes.append(node_count-nodes_deleted)
+    val_accuracy.append(get_accuracy(val_features,val_labels,root))
+    train_accuracy.append(get_accuracy(train_features,train_labels,root))
+    test_accuracy.append(get_accuracy(test_features,test_labels,root))
+
+    plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes)
+
+
 def build_tree_and_get_acc(train_features,train_labels ,test_features,
         test_labels,val_features,val_labels, setting):
 
@@ -244,13 +300,18 @@ def build_tree_and_get_acc(train_features,train_labels ,test_features,
     test_acc = get_accuracy(test_features,test_labels,root,setting)
     print("Testing set Accuracy:",test_acc)
 
+    return root
+
 def part_a(train_file, test_file, val_file):
     train_features,train_labels = preprocess_data(train_file)
     val_features,val_labels = preprocess_data(val_file)      
     test_features,test_labels = preprocess_data(test_file)
 
-    build_tree_and_get_acc(train_features,train_labels ,test_features,
+    root = build_tree_and_get_acc(train_features,train_labels ,test_features,
         test_labels,val_features,val_labels, "median_fixed")
+
+    plot_as_tree_grows(train_features,train_labels,test_features,test_labels,
+                    val_features,val_labels,root)
 
 def part_c(train_file, test_file, val_file):
     train_features,train_labels = get_data(train_file)
@@ -292,7 +353,8 @@ def tree_pruning(train_features,train_labels,test_features,test_labels,val_featu
         if((next_acc - prev_acc) <= 1e-4):
             break
         prev_acc = next_acc
-        node_count = node_count - len(node_to_prune.children)
+        if node_to_prune.children:
+            node_count = node_count - len(node_to_prune.children)
         node_to_prune.children = {}
 
         #update graph parameters
@@ -302,7 +364,8 @@ def tree_pruning(train_features,train_labels,test_features,test_labels,val_featu
         test_accuracy.append(get_accuracy(test_features,test_labels,root))
 
         iter += 1
-
+    
+    plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes)
 
     return prev_acc
 
