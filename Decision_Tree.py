@@ -14,7 +14,7 @@ def get_data(data_file):
     training_data = np.array(data.values[1:,1:]).astype(int)
     features = training_data[:,:-1]
     labels = training_data[:,-1]
-    print(features.shape,labels.shape)
+    #print(features.shape,labels.shape)
     return features, labels
 
 #one hot encoder used for changing the categorical attributes to binary attributes
@@ -134,13 +134,23 @@ def info_gain(H_parent, features, labels, feature_no):
     IG = H_parent - np.sum(np.multiply(prob_vals,h_vals))  
     return IG
 
+#report part(c) of the assignment-----------------------------------------------------
+branch_count = 0
+def report_attr_split_count_branch_wise(split_attr_dict):
+    global branch_count
+    branch_count += 1
+    print("Branch ",branch_count,",Dictionary(attr_no:count):",split_attr_dict)
+    attr_no = max(split_attr_dict, key = split_attr_dict.get)
+    print("Attribute that splitted maximum is:",attr_no,",times:",split_attr_dict[attr_no])
+
 #creating decision tree
-def grow_tree(attr_set, features, labels, setting="median_fixed"):
+def grow_tree(attr_set, features, labels, split_attr_dict,setting="median_fixed"):
     #compute entropy of node
     entropy = compute_entropy(labels)
     
     #leaf node if all examples are either true of false
     if entropy == 0:
+        report_attr_split_count_branch_wise(split_attr_dict)
         return NodeType(None,labels[0])
     
     #get the majority labels
@@ -164,9 +174,10 @@ def grow_tree(attr_set, features, labels, setting="median_fixed"):
             max_gain = IG
             max_gain_feature = feature_no
     
-    print("max IG:",max_gain,",attr:",max_gain_feature)
+    #print("max IG:",max_gain,",attr:",max_gain_feature)
     #stop if max IG is very less
     if max_gain <= 1e-10:
+        report_attr_split_count_branch_wise(split_attr_dict)
         return NodeType(None,majority)
     
    #create node with feature_no,majority
@@ -181,9 +192,15 @@ def grow_tree(attr_set, features, labels, setting="median_fixed"):
     else:
         attr_vals,features_set,labels_set = break_data(features, labels, max_gain_feature)
     
+    #maintain dictionary of splitted attribute and no of times it is used for splitting in a branch
+    if max_gain_feature not in split_attr_dict:
+        split_attr_dict[max_gain_feature] = 0
+    split_attr_dict[max_gain_feature] += 1
+
+    #splitting features and recursively growing tree
     for i in range(len(attr_vals)):
         val = attr_vals[i]
-        node.children[val] = grow_tree(attr_set, features_set[i], labels_set[i],setting)
+        node.children[val] = grow_tree(attr_set, features_set[i], labels_set[i],split_attr_dict,setting)
         
     return node
 
@@ -208,12 +225,10 @@ def get_accuracy(features,labels,root,setting = "median_fixed"):
     correct_count = np.sum([predictions==labels])
     return (correct_count*100)/labels.size
 
-def part_a(train_file, test_file, val_file, setting = "median_fixed"):
-    train_features,train_labels = preprocess_data(train_file)
-    val_features,val_labels = preprocess_data(val_file)      
-    test_features,test_labels = preprocess_data(test_file)
+def build_tree_and_get_acc(train_features,train_labels ,test_features,
+        test_labels,val_features,val_labels, setting):
 
-    root = grow_tree(set(range(23)), train_features, train_labels, setting)
+    root = grow_tree(set(range(23)), train_features, train_labels, {}, setting)
 
     #for graphical view
     #tree_node = Node(str(root.data))
@@ -229,12 +244,43 @@ def part_a(train_file, test_file, val_file, setting = "median_fixed"):
     test_acc = get_accuracy(test_features,test_labels,root,setting)
     print("Testing set Accuracy:",test_acc)
 
-def tree_pruning(list_nodes,val_features,val_labels,root):
+def part_a(train_file, test_file, val_file):
+    train_features,train_labels = preprocess_data(train_file)
+    val_features,val_labels = preprocess_data(val_file)      
+    test_features,test_labels = preprocess_data(test_file)
+
+    build_tree_and_get_acc(train_features,train_labels ,test_features,
+        test_labels,val_features,val_labels, "median_fixed")
+
+def part_c(train_file, test_file, val_file):
+    train_features,train_labels = get_data(train_file)
+    val_features,val_labels = get_data(val_file)      
+    test_features,test_labels = get_data(test_file)
+
+    build_tree_and_get_acc(train_features,train_labels ,test_features,
+        test_labels,val_features,val_labels, "median_variable")
+
+def tree_pruning(train_features,train_labels,test_features,test_labels,val_features,val_labels,root):
     prev_acc = get_accuracy(val_features,val_labels,root)
+    train_acc = get_accuracy(train_features,train_labels,root)
+    test_acc = get_accuracy(test_features,test_labels,root)
     iter = 0
+
+    #get total no of nodes
+    node_count = NodeType.node_count
+
+    #parameters for plotting the graph
+    total_nodes = [node_count]
+    val_accuracy = [prev_acc]
+    train_accuracy =  [train_acc]
+    test_accuracy = [test_acc]
+
     while(iter <= 100000):
         accuracies = []
-        for node in list_nodes:
+        #get all the nodes
+        root.BFS_traversal()
+
+        for node in NodeType.node_list:
             temp_child = node.children
             node.children = {}
             accuracies.append(get_accuracy(val_features,val_labels,root))
@@ -242,12 +288,22 @@ def tree_pruning(list_nodes,val_features,val_labels,root):
             
         next_acc = max(accuracies)
         print("iteration:",iter,",Max_Accuracy",next_acc)
-        node_to_prune = list_nodes[accuracies.index(next_acc)]
+        node_to_prune = NodeType.node_list[accuracies.index(next_acc)]
         if((next_acc - prev_acc) <= 1e-4):
             break
         prev_acc = next_acc
+        node_count = node_count - len(node_to_prune.children)
         node_to_prune.children = {}
+
+        #update graph parameters
+        total_nodes.append(node_count)
+        val_accuracy.append(prev_acc)
+        train_accuracy.append(get_accuracy(train_features,train_labels,root))
+        test_accuracy.append(get_accuracy(test_features,test_labels,root))
+
         iter += 1
+
+
     return prev_acc
 
 def part_b(train_file, test_file, val_file):
@@ -255,9 +311,10 @@ def part_b(train_file, test_file, val_file):
     val_features,val_labels = preprocess_data(val_file)      
     test_features,test_labels = preprocess_data(test_file)
 
-    root = grow_tree(set(range(23)), train_features, train_labels)
-    root.BFS_traversal()  
-    max_acc = tree_pruning(NodeType.node_list,val_features,val_labels,root)
+    root = grow_tree(set(range(23)), train_features, train_labels,{})  
+    max_acc = tree_pruning(train_features,train_labels,test_features, test_labels,
+                    val_features,val_labels, root)
+
     print("Accuracy after pruning in validation set:", max_acc)
     
     #Tree has been pruned, now get the Accuracies 
@@ -299,8 +356,9 @@ def plot_acc(x_vals, accuracy, label="Parameters Varying."):
     plt.plot(x_vals, accuracy)
     
     plt.legend(['Max Accuracy: %.1f' % max_acc])
-    plt.ylabel('Accuracy---->')
-    plt.xlabel(label,"---->")
+    plt.ylabel('Validation Accuracy---->')
+    label = label+"---->"
+    plt.xlabel(label)
     
     plt.show()
     plt.close()
@@ -312,6 +370,8 @@ def part_d(train_file, test_file, val_file):
 
     train_features,train_labels = get_data(train_file)
     val_features,val_labels = get_data(val_file)
+    test_features,test_labels = get_data(test_file)
+
     params = ["gini", 0]
     val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*params)
 
@@ -390,7 +450,7 @@ def part_d(train_file, test_file, val_file):
     val_accuracy = np.max(accuracy)
     ind = accuracy.index(val_accuracy)
     length = len(leaf_sizes)
-    split = split_sizes[ind/length]
+    split = split_sizes[int(ind/length)]
     leaf = leaf_sizes[ind%length]
     if(val_accuracy >= max_accuracy):
         max_accuracy = val_accuracy 
@@ -406,6 +466,7 @@ def part_d(train_file, test_file, val_file):
     test_accuracy = accuracy_dt_library(train_features,train_labels,test_features,test_labels,*best_params)
     print("Test set Accuracy: ",test_accuracy*100)
 
+    print("Best Parameters:",best_params)
     return best_params, max_accuracy
 
 #----------------------part(e)--------------------------------------
@@ -422,7 +483,7 @@ def get_one_hot_encoded_data(data_file):
 
 def part_e(train_file, test_file, val_file):
     #-------------------------------get best parameters----------------------------
-    best_params,max_accuracy = part_d(train_file, test_file, val_file)
+    best_params,_ = part_d(train_file, test_file, val_file)
 
     #get one hot encoded data
     train_features,train_labels = get_one_hot_encoded_data(train_file)
@@ -466,6 +527,7 @@ def part_f(train_file, test_file, val_file):
         params = ["gini", 0, t]
         val_accuracy = accuracy_forest_library(train_features,train_labels,val_features,val_labels,*params)
         accuracy.append(val_accuracy*100)
+        print("tree count:",t)
     plot_acc(trees, accuracy, "No of trees")
     
     #set best params
@@ -482,7 +544,7 @@ def part_f(train_file, test_file, val_file):
         params = ["gini", 0, 10,feature]
         val_accuracy = accuracy_forest_library(train_features,train_labels,val_features,val_labels,*params)
         accuracy.append(val_accuracy*100)
-        
+        print("feature_count:",feature)
     plot_acc(feature_sizes, accuracy, "feature_sizes")
 
     #set best params
@@ -502,6 +564,7 @@ def part_f(train_file, test_file, val_file):
     test_accuracy = accuracy_forest_library(train_features,train_labels,test_features,test_labels,*best_params)
     print("Test set Accuracy: ",test_accuracy*100)
 
+    print("Best Parameters:",best_params)
     return best_params,max_accuracy
 
 def decision_tree(sub_part, train_file, test_file, val_file):
@@ -510,7 +573,7 @@ def decision_tree(sub_part, train_file, test_file, val_file):
     elif(sub_part == 2):
         part_b(train_file, test_file, val_file)
     elif(sub_part == 3):
-        part_a(train_file, test_file, val_file, setting = "median_variable")
+        part_c(train_file, test_file, val_file)
     elif(sub_part == 4):
         part_d(train_file, test_file, val_file)
     elif(sub_part == 5):
