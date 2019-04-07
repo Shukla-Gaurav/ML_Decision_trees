@@ -6,6 +6,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 import queue
+import sys
 
 #fetch the data from the file
 def get_data(data_file):
@@ -272,162 +273,236 @@ def part_b(train_file, test_file, val_file):
 
 #---------------------------part (d)-----------------------------------------------
 
-def get_acc_using_params(flag,params,train_features,train_labels,val_features,val_labels):   
-    if(flag == 0):
-        dt = DecisionTreeClassifier(criterion=params[0],random_state=params[1])
-    if(flag == 1):
-        dt = DecisionTreeClassifier(criterion=params[0],max_depth=params[2],random_state=params[1])
-    elif(flag == 2):
-        dt = DecisionTreeClassifier(criterion=params[0],min_samples_split=params[2],random_state=params[1])
-    elif(flag == 3):
-        dt = DecisionTreeClassifier(criterion=params[0],min_samples_leaf=params[2],random_state=params[1])
-    elif(flag == 4):
-        dt = DecisionTreeClassifier(criterion=params[0],min_samples_split = params[2], min_samples_leaf=params[3],random_state=params[1])
+def accuracy_dt_library(train_features,train_labels,val_features,val_labels, 
+    criteria="gini",state=0,depth=None,min_split=2,min_leaf=1):
+
+    dt = DecisionTreeClassifier(criterion=criteria, random_state = state, max_depth = depth, 
+        min_samples_split = min_split, min_samples_leaf=min_leaf)
 
     dt.fit(train_features,train_labels)
     val_accuracy = dt.score(val_features,val_labels)
     return val_accuracy
 
-def plot_acc(x_vals, accuracy):
+def accuracy_forest_library(train_features,train_labels,val_features,val_labels, criteria="gini",
+    state=0,estimators=10,features="auto",boot=True,depth=None,min_split=2,min_leaf=1):
+
+    rf = RandomForestClassifier(criterion=criteria, random_state = state, n_estimators = estimators, 
+        max_features = features, bootstrap = boot, max_depth = depth, 
+        min_samples_split = min_split, min_samples_leaf=min_leaf)
+
+    rf.fit(train_features,train_labels)
+    val_accuracy = rf.score(val_features,val_labels)
+    return val_accuracy
+
+def plot_acc(x_vals, accuracy, label="Parameters Varying."):
     max_acc=max(accuracy)
     plt.plot(x_vals, accuracy)
     
     plt.legend(['Max Accuracy: %.1f' % max_acc])
-    plt.ylabel('Accuracy-->')
-    plt.xlabel('parameter------>')
+    plt.ylabel('Accuracy---->')
+    plt.xlabel(label,"---->")
     
     plt.show()
     plt.close()
-    
+
+#arg order: criteria="gini",state=0,depth=None,min_split=2,min_leaf=1 
 def part_d(train_file, test_file, val_file):
+    best_params = []
+    max_accuracy = 0
+
     train_features,train_labels = get_data(train_file)
     val_features,val_labels = get_data(val_file)
     params = ["gini", 0]
-    val_accuracy = get_acc_using_params(0,params,train_features,train_labels,val_features,val_labels)
+    val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*params)
 
     print("Validation set Accuracy:",val_accuracy*100)
+   
+    #set best params
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0]
    
     print("1.varying max_depth ....")
     depths = list(range(1,50))
     accuracy=[]
     for d in depths:
         params = ["gini", 0, d]
-        val_accuracy = get_acc_using_params(1,params,train_features,train_labels,val_features,val_labels)
+        val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*params)
         accuracy.append(val_accuracy*100)
         print("depth:",d)
-    plot_acc(depths, accuracy)
+    plot_acc(depths, accuracy, "max_depth")
     
+
+    #set best params
+    val_accuracy = np.max(accuracy)
+    d = depths[accuracy.index(val_accuracy)]
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0, d]
+
     print("2.Varying min_samples_split")
     split_sizes=list(range(5, 200, 20))
     accuracy=[]
     for split in split_sizes:
-        params = ["gini",0,split]
-        val_accuracy = get_acc_using_params(2,params,train_features,train_labels,val_features,val_labels)
+        params = ["gini",0,None,split]
+        val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*params)
         accuracy.append(val_accuracy*100)
         print("split_size:",split)
-    plot_acc(split_sizes, accuracy)
+    plot_acc(split_sizes, accuracy, "min_samples_split")
     
+    #set best params
+    val_accuracy = np.max(accuracy)
+    s = split_sizes[accuracy.index(val_accuracy)]
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0, None, s]
+
     print("3.Varying min_samples_leaf")
     leaf_sizes=list(range(10, 200, 5))
     accuracy=[]
     for leaf in leaf_sizes:
-        params = ["gini",0,leaf]
-        val_accuracy = get_acc_using_params(3,params,train_features,train_labels,val_features,val_labels)
+        params = ["gini",0,None,2,leaf]
+        val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*params)
         accuracy.append(val_accuracy*100)
         
-    plot_acc(leaf_sizes, accuracy)
+    plot_acc(leaf_sizes, accuracy,"min_samples_leaf")
 
-    print("4.Varying both min_samples_leaf and min_samples_split")
+    #set best params
+    val_accuracy = np.max(accuracy)
+    l = leaf_sizes[accuracy.index(val_accuracy)]
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0, None, 2,l]
+
+
+    print("4.Varying both min_samples_leaf and min_samples_split..")
     accuracy=[]
     for split in split_sizes:
          for leaf in leaf_sizes:
-            params = ["gini",0,split,leaf]
-            val_accuracy = get_acc_using_params(4,params,train_features,train_labels,val_features,val_labels)
+            params = ["gini",0,None,split,leaf]
+            val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*params)
             accuracy.append(val_accuracy*100)
             print("split,leaf:",split,",",leaf)
     x_vals = list(range(len(accuracy)))    
-    plot_acc(x_vals, accuracy)
+    plot_acc(x_vals, accuracy,"varying min_samples_leaf and min_samples_split")
 
+    #set best params
+    val_accuracy = np.max(accuracy)
+    ind = accuracy.index(val_accuracy)
+    length = len(leaf_sizes)
+    split = split_sizes[ind/length]
+    leaf = leaf_sizes[ind%length]
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0, None, split, leaf]
+
+    #--------------------------Reporting accuracies on best_params------------------------------------------------
+    train_accuracy = accuracy_dt_library(train_features,train_labels,train_features,train_labels,*best_params)
+    print("Training set Accuracy: ",train_accuracy*100)
+
+    val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*best_params)
+    print("Validation set Accuracy: ",val_accuracy*100)
+    
+    test_accuracy = accuracy_dt_library(train_features,train_labels,test_features,test_labels,*best_params)
+    print("Test set Accuracy: ",test_accuracy*100)
+
+    return best_params, max_accuracy
+
+#----------------------part(e)--------------------------------------
+def get_one_hot_encoded_data(data_file):
+    cols = [1,2,3,5,6,7,8,9,10]
+    col_vals = [[1, 2],[0, 1, 2, 3, 4, 5, 6],[0, 1, 2, 3],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
+    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
+
+    features,labels = get_data(data_file)
+    features = one_hot_encoder(features,cols,col_vals)
+    return features, labels
 
 def part_e(train_file, test_file, val_file):
-    train_features,train_labels = get_data(train_file)
-    val_features,val_labels = get_data(val_file)
-    cols = [1,2,3,5,6,7,8,9,10]
-    col_vals = [[1, 2],[0, 1, 2, 3, 4, 5, 6],[0, 1, 2, 3],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
-    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
-    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
-    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
-    train_features = one_hot_encoder(train_features,cols,col_vals)
-    val_features = one_hot_encoder(val_features,cols,col_vals)
-    for leaf in list(range(60,100,5)):
-        params = ["gini",0,leaf]
-        val_accuracy = get_acc_using_params(3,params,train_features,train_labels,val_features,val_labels)
-        print(leaf,":",val_accuracy*100)
-    #part_d(train_features,train_labels, val_features,val_labels)
+    #-------------------------------get best parameters----------------------------
+    best_params,max_accuracy = part_d(train_file, test_file, val_file)
 
+    #get one hot encoded data
+    train_features,train_labels = get_one_hot_encoded_data(train_file)
+    val_features,val_labels = get_one_hot_encoded_data(val_file)
+    test_features,test_labels = get_one_hot_encoded_data(test_file)
+    
+    train_accuracy = accuracy_dt_library(train_features,train_labels,train_features,train_labels,*best_params)
+    print("Training set Accuracy: ",train_accuracy*100)
+
+    val_accuracy = accuracy_dt_library(train_features,train_labels,val_features,val_labels,*best_params)
+    print("Validation set Accuracy: ",val_accuracy*100)
+    
+    test_accuracy = accuracy_dt_library(train_features,train_labels,test_features,test_labels,*best_params)
+    print("Test set Accuracy: ",test_accuracy*100)
+
+#arg order: criteria="gini",state=0,estimators=10,features="auto",boot=True
 def part_f(train_file, test_file, val_file):
-    train_features,train_labels = get_data(train_file)
-    val_features,val_labels = get_data(val_file)
-    cols = [1,2,3,5,6,7,8,9,10]
-    col_vals = [[1, 2],[0, 1, 2, 3, 4, 5, 6],[0, 1, 2, 3],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
-    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
-    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],[-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9], \
-    [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
-    train_features = one_hot_encoder(train_features,cols,col_vals)
-    val_features = one_hot_encoder(val_features,cols,col_vals)
 
-    rf = RandomForestClassifier(criterion="gini",random_state=0)
-    rf.fit(train_features,train_labels)
+    #get best parameters and corresponding accuracy
+    best_params = []
+    max_accuracy = 0
+    
+    #get all the data
+    train_features,train_labels = get_one_hot_encoded_data(train_file)
+    val_features,val_labels = get_one_hot_encoded_data(val_file)
+    test_features,test_labels = get_one_hot_encoded_data(test_file)
+
+    params = ["gini",0]
+    val_accuracy = accuracy_forest_library(train_features,train_labels,val_features,val_labels,*params)
+    print("Validation set Accuracy:",val_accuracy*100)
    
-    acc = rf.score(val_features,val_labels)
-    print("Validation set Accuracy:",acc*100)
-   
+    #set best params
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = params
+
     print("1.varying no of trees ....")
     trees = list(range(10,200,10))
     accuracy=[]
     for t in trees:
-        rf = RandomForestClassifier(criterion="entropy",random_state=0,n_estimators=t)
-        rf.fit(train_features,train_labels)
-   
-        acc = rf.score(val_features,val_labels)
-        print("Validation set Accuracy:",acc*100)
-        accuracy.append(acc*100)
-        print("tree_count:",t)
-    plot_acc(trees, accuracy)
-    accuracy=[]
-    for t in trees:
-        rf = RandomForestClassifier(criterion="entropy",random_state=0,n_estimators=t,bootstrap=False)
-        rf.fit(train_features,train_labels)
-   
-        acc = rf.score(val_features,val_labels)
-        print("Validation set Accuracy:",acc*100)
-        accuracy.append(acc*100)
-        print("tree_count:",t)
-    plot_acc(trees, accuracy)
+        params = ["gini", 0, t]
+        val_accuracy = accuracy_forest_library(train_features,train_labels,val_features,val_labels,*params)
+        accuracy.append(val_accuracy*100)
+    plot_acc(trees, accuracy, "No of trees")
     
-    print("2.Varying max_features.")
-    feature_sizes=list(range(1, 10))
-    accuracy = []
-    for feature in feature_sizes:
-        rf = RandomForestClassifier(criterion="entropy",random_state=0,max_features=feature)
-        rf.fit(train_features,train_labels)
-   
-        acc = rf.score(val_features,val_labels)
-        print("Validation set Accuracy:",acc*100)
-        accuracy.append(acc*100)
-        print("max_features:",feature)
-    plot_acc(feature_sizes, accuracy)
-    accuracy = []
-    for feature in feature_sizes:
-        rf = RandomForestClassifier(criterion="entropy",random_state=0,max_features=feature,bootstrap=False)
-        rf.fit(train_features,train_labels)
-   
-        acc = rf.score(val_features,val_labels)
-        print("Validation set Accuracy:",acc*100)
-        accuracy.append(acc*100)
-        print("max_features:",feature)
-    plot_acc(feature_sizes, accuracy)
+    #set best params
+    val_accuracy = np.max(accuracy)
+    t = trees[accuracy.index(val_accuracy)]
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0, t]
 
+    print("2.Varying max_features.")
+    feature_sizes=list(range(1, 20))
+    accuracy = []
+    for feature in feature_sizes:
+        params = ["gini", 0, 10,feature]
+        val_accuracy = accuracy_forest_library(train_features,train_labels,val_features,val_labels,*params)
+        accuracy.append(val_accuracy*100)
+        
+    plot_acc(feature_sizes, accuracy, "feature_sizes")
+
+    #set best params
+    val_accuracy = np.max(accuracy)
+    f = feature_sizes[accuracy.index(val_accuracy)]
+    if(val_accuracy >= max_accuracy):
+        max_accuracy = val_accuracy 
+        best_params = ["gini", 0, 10,f]
+
+    #-------------------report accuracies on best parameters------------------------------------------
+    train_accuracy = accuracy_forest_library(train_features,train_labels,train_features,train_labels,*best_params)
+    print("Training set Accuracy: ",train_accuracy*100)
+
+    val_accuracy = accuracy_forest_library(train_features,train_labels,val_features,val_labels,*best_params)
+    print("Validation set Accuracy: ",val_accuracy*100)
+    
+    test_accuracy = accuracy_forest_library(train_features,train_labels,test_features,test_labels,*best_params)
+    print("Test set Accuracy: ",test_accuracy*100)
+
+    return best_params,max_accuracy
 
 def decision_tree(sub_part, train_file, test_file, val_file):
     if(sub_part == 1):
@@ -443,12 +518,14 @@ def decision_tree(sub_part, train_file, test_file, val_file):
     elif(sub_part == 6):
         part_f(train_file, test_file, val_file)
 
-#decision_tree('c',"../credit-cards.train.csv","../credit-cards.train.csv","../test.csv")
-#part_b("../credit-cards.train.csv","../credit-cards.val.csv")
-#train_features,train_labels = get_data("../credit-cards.train.csv")
-#val_features,val_labels = get_data("../credit-cards.val.csv")
-#part_d(train_features,train_labels, val_features,val_labels)
-part_f("../credit-cards.train.csv","../credit-cards.test.csv","../credit-cards.val.csv")
+if __name__ == '__main__':
+    #reading the command line data
+    sub_part = int(sys.argv[1])
+    train_file = sys.argv[2]
+    test_file = sys.argv[3]
+    val_file = sys.argv[4] 
+    decision_tree(sub_part, train_file, test_file, val_file)
+
 
 
 
