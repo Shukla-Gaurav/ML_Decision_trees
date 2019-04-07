@@ -40,13 +40,14 @@ def sig(x):
 def sigmoid(input_to_layer):
     vec = np.vectorize(sig)
     return vec(input_to_layer)                    
-                                             
+                                            
 def forward_pass(input_data, activation_fn, layers):
     total_layers = len(layers)
     
     #set x0 =1 for bias
     input_data = np.c_[np.ones(input_data.shape[0]),input_data]
     layers[0]["net_input"] = input_data
+    print(input_data)
     
     for i in range(total_layers-1):
         next_net_input = layers[i]["weights"] @ layers[i]["net_input"].T
@@ -59,7 +60,8 @@ def forward_pass(input_data, activation_fn, layers):
         #set x0=1 for next_net_input
         layers[i+1]["net_input"] = next_net_input.T
         layers[i+1]["net_input"] = np.c_[np.ones(layers[i+1]["net_input"].shape[0]),layers[i+1]["net_input"]]
-    #print(sigmoid(layers[total_layers-1]["weights"] @ layers[total_layers-1]["net_input"].T ))
+        print(i+1,":",layers[i+1]["net_input"])
+    #print(layers[total_layers-1]["weights"])
     
 
 def initialize_layers(nodes_each_layer,no_of_features,batch_size):
@@ -69,8 +71,8 @@ def initialize_layers(nodes_each_layer,no_of_features,batch_size):
     #initialize layer 0
     layer = {}
     layer["node_count"] = nodes_each_layer[0]
-    layer["weights"] = np.random.normal(0, 0.001, size=(nodes_each_layer[0], no_of_features+1))
-    #layer["weights"] = np.zeros((nodes_each_layer[0], no_of_features+1))
+    #layer["weights"] = np.random.normal(0, 0.001, size=(nodes_each_layer[0], no_of_features+1))
+    layer["weights"] = np.zeros((nodes_each_layer[0], no_of_features+1))
     #layer["weights"] = pickle.load(open("w_20_86","rb"))
     
     layer["net_input"] = np.zeros((batch_size,no_of_features+1))
@@ -80,8 +82,8 @@ def initialize_layers(nodes_each_layer,no_of_features,batch_size):
     for i in range(1,no_layers):
         layer = {}
         layer["node_count"] = nodes_each_layer[i]
-        layer["weights"] = np.random.normal(0, 0.001, size=(nodes_each_layer[i], nodes_each_layer[i-1]+1))
-        #layer["weights"] = np.zeros((nodes_each_layer[i], nodes_each_layer[i-1]+1))
+        #layer["weights"] = np.random.normal(0, 0.001, size=(nodes_each_layer[i], nodes_each_layer[i-1]+1))
+        layer["weights"] = np.zeros((nodes_each_layer[i], nodes_each_layer[i-1]+1))
         #layer["weights"] = pickle.load(open("w_10_21","rb"))
         
         layer["net_input"] = np.zeros((batch_size,nodes_each_layer[i-1]+1))
@@ -113,15 +115,11 @@ def back_propagation(labels, predictions, last_layer, layers, learning_rate, act
         derv = get_derivative(y,activation_fn)
         delta_L = np.multiply(temp, derv[:,1:])
         
-        
-        #remove first column as that will be all 0
-        delta_L = delta_L
-        
         delta_w = delta_L.T @ layers[i]["net_input"]
             
-        
         updated_weights = layers[i]["weights"] + learning_rate * delta_w/batch_size
     layers[0]["weights"] = updated_weights
+    print(updated_weights)
     
 def mean_sq_error(labels, predictions):  
     #print(predictions)
@@ -175,15 +173,16 @@ def train(nodes_each_layer, batch_size, features, labels, num_epochs, activation
         print("== EPOCH: ", j, " ==")
         while i+batch_size <= len(features):
             error = train_per_batch(layers, features[i:i+batch_size], labels[i:i+batch_size], activation_fn, learning_rate)
+            
             errors.append(error)
             i += batch_size
-            
+            input()
         error_metric.append(np.mean(errors))
-        
         if j % 10==0:
             features,labels = get_data("../train.csv")
             get_accuracy(layers, features, labels, "sigmoid")
-        features = shuffle(features)
+            print(error) 
+        #features = shuffle(features)
     return layers
 
 def plot(errors):
@@ -198,7 +197,7 @@ def plot(errors):
 features,labels = get_data("../train.csv")
 
 errors = []
-layers = train([5,10],100,features,labels,1000,"sigmoid",1,"layers.pkl",errors)
+layers = train([25,10],100,features,labels,400,"sigmoid",0.1,"layers.pkl",errors)
 
 plot(errors)
 
