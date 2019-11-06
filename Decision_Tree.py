@@ -139,9 +139,10 @@ branch_count = 0
 def report_attr_split_count_branch_wise(split_attr_dict):
     global branch_count
     branch_count += 1
-    print("Branch ",branch_count,",Dictionary(attr_no:count):",split_attr_dict)
     attr_no = max(split_attr_dict, key = split_attr_dict.get)
-    print("Attribute that splitted maximum is:",attr_no,",times:",split_attr_dict[attr_no])
+    if(split_attr_dict[attr_no] >= 5):
+        print("Branch ",branch_count,",Dictionary(attr_no:count):",split_attr_dict)
+        print("Attribute that splitted maximum is:",attr_no,",split times:",split_attr_dict[attr_no])
 
 #creating decision tree
 def grow_tree(attr_set, features, labels, split_attr_dict,setting="median_fixed"):
@@ -228,6 +229,12 @@ def get_accuracy(features,labels,root,setting = "median_fixed"):
 #-----------------------Plotting--------------------------------------------------------------
 
 def plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes):
+
+    train_accuracy = train_accuracy[::-1]
+    val_accuracy = val_accuracy[::-1]
+    test_accuracy = test_accuracy[::-1]
+    total_nodes = total_nodes[::-1]
+
     plt.plot(total_nodes, train_accuracy, 'r', label = "Training Accuracy")
     plt.plot(total_nodes, val_accuracy, 'y', label = "Validation Accuracy")
     plt.plot(total_nodes, test_accuracy, 'b', label = "Test Accuracy")
@@ -239,11 +246,11 @@ def plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes):
     plt.savefig('part_b.png')
 
 def plot_as_tree_grows(train_features,train_labels,test_features,test_labels,
-                    val_features,val_labels,root):
+                    val_features,val_labels,root,setting = "median_fixed"):
     
-    val_acc = get_accuracy(val_features,val_labels,root)
-    train_acc = get_accuracy(train_features,train_labels,root)
-    test_acc = get_accuracy(test_features,test_labels,root)
+    val_acc = get_accuracy(val_features,val_labels,root,setting)
+    train_acc = get_accuracy(train_features,train_labels,root,setting)
+    test_acc = get_accuracy(test_features,test_labels,root,setting)
 
     root.BFS_traversal()
     list_nodes = NodeType.node_list[::-1]
@@ -266,17 +273,17 @@ def plot_as_tree_grows(train_features,train_labels,test_features,test_labels,
         if(nodes_deleted >= 200):
             node_count = node_count - nodes_deleted
             total_nodes.append(node_count)
-            val_accuracy.append(get_accuracy(val_features,val_labels,root))
-            train_accuracy.append(get_accuracy(train_features,train_labels,root))
-            test_accuracy.append(get_accuracy(test_features,test_labels,root))
+            val_accuracy.append(get_accuracy(val_features,val_labels,root,setting))
+            train_accuracy.append(get_accuracy(train_features,train_labels,root,setting))
+            test_accuracy.append(get_accuracy(test_features,test_labels,root,setting))
 
             #reset no of nodes deleted
             nodes_deleted = 0
 
     total_nodes.append(node_count-nodes_deleted)
-    val_accuracy.append(get_accuracy(val_features,val_labels,root))
-    train_accuracy.append(get_accuracy(train_features,train_labels,root))
-    test_accuracy.append(get_accuracy(test_features,test_labels,root))
+    val_accuracy.append(get_accuracy(val_features,val_labels,root,setting))
+    train_accuracy.append(get_accuracy(train_features,train_labels,root,setting))
+    test_accuracy.append(get_accuracy(test_features,test_labels,root,setting))
 
     plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes)
 
@@ -318,8 +325,11 @@ def part_c(train_file, test_file, val_file):
     val_features,val_labels = get_data(val_file)      
     test_features,test_labels = get_data(test_file)
 
-    build_tree_and_get_acc(train_features,train_labels ,test_features,
+    root = build_tree_and_get_acc(train_features,train_labels ,test_features,
         test_labels,val_features,val_labels, "median_variable")
+
+    plot_as_tree_grows(train_features,train_labels,test_features,test_labels,
+                    val_features,val_labels,root,"median_variable")
 
 def tree_pruning(train_features,train_labels,test_features,test_labels,val_features,val_labels,root):
     prev_acc = get_accuracy(val_features,val_labels,root)
@@ -362,7 +372,7 @@ def tree_pruning(train_features,train_labels,test_features,test_labels,val_featu
         val_accuracy.append(prev_acc)
         train_accuracy.append(get_accuracy(train_features,train_labels,root))
         test_accuracy.append(get_accuracy(test_features,test_labels,root))
-
+        print("iteration:",iter)
         iter += 1
     
     plot_accuracies(train_accuracy, val_accuracy,test_accuracy, total_nodes)
