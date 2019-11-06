@@ -6,6 +6,14 @@ import pickle
 import matplotlib.pyplot as plt
 import math
 from sklearn.utils import shuffle
+from sklearn.metrics import confusion_matrix
+import csv
+def write_csv(features,labels,csv_file):
+    with open(csv_file, mode='w') as _file:
+        writer = csv.writer(_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        data = np.hstack((features,labels))
+        #print(data)
+        writer.writerows(data)
 
 def get_data(data_file):
     data = pd.read_csv(data_file,header=None)
@@ -26,6 +34,7 @@ def get_data(data_file):
     features = input_data[:,:features_count]
     
     labels = input_data[:,features_count:]
+    write_csv(features,labels,data_file+".csv")
     return features,labels
 
 def relu(input_to_layer):
@@ -72,7 +81,6 @@ def initialize_layers(nodes_each_layer,no_of_features,batch_size):
     layer["node_count"] = nodes_each_layer[0]
     layer["weights"] = np.random.uniform(-0.5, 0.5, size=(nodes_each_layer[0], no_of_features+1))
     #layer["weights"] = np.zeros((nodes_each_layer[0], no_of_features+1))
-    #layer["weights"] = pickle.load(open("w_20_86","rb"))
     
     layer["net_input"] = np.zeros((batch_size,no_of_features+1))
     layers.append(layer)
@@ -83,7 +91,6 @@ def initialize_layers(nodes_each_layer,no_of_features,batch_size):
         layer["node_count"] = nodes_each_layer[i]
         layer["weights"] = np.random.uniform(-0.5, 0.5, size=(nodes_each_layer[i], nodes_each_layer[i-1]+1))
         #layer["weights"] = np.zeros((nodes_each_layer[i], nodes_each_layer[i-1]+1))
-        #layer["weights"] = pickle.load(open("w_10_21","rb"))
         
         layer["net_input"] = np.zeros((batch_size,nodes_each_layer[i-1]+1))
         layers.append(layer)
@@ -158,26 +165,29 @@ def get_accuracy(layers, features, labels, activation_fn):
     
     total_count = len(predictions)
     correct_count = np.sum(np.all(labels == predictions, axis=1))
-    
+    #print(confusion_matrix(labels,predictions))
     print("Accuracy: ", correct_count*100/total_count)
 
 
-def train(nodes_each_layer, batch_size, features, labels, num_epochs, activation_fn, learning_rate, dump_file, error_metric):
-    no_of_features = features.shape[1]
+def train(nodes_each_layer, batch_size, train_features, train_labels, test_features, test_labels, 
+num_epochs, activation_fn, learning_rate, dump_file, error_metric,setting=0):
+    no_of_features = train_features.shape[1]
     layers = initialize_layers(nodes_each_layer,no_of_features, batch_size)
     for j in range(num_epochs):
         errors = []
         i = 0
         print("== EPOCH: ", j, " ==")
-        while i+batch_size <= len(features):
-            error = train_per_batch(layers, features[i:i+batch_size], labels[i:i+batch_size], activation_fn, learning_rate)
-            
+        while i+batch_size <= len(train_features):
+            error = train_per_batch(layers, train_features[i:i+batch_size], train_labels[i:i+batch_size], activation_fn, learning_rate)
             errors.append(error)
             i += batch_size
         error_metric.append(np.mean(errors))
-        if j % 10==0:
-            features,labels = get_data("../train.csv")
-            get_accuracy(layers, features, labels, "sigmoid")
+
+        if len(error_metric)>2 and setting ==1 and np.abs(error_metric[-1] - error_metric[-2])<1e-5 :
+            learning_rate = learning_rate/5
+
+        if j % 100==0:
+            get_accuracy(layers, test_features, test_labels, activation_fn)
             print(error) 
         
     return layers
@@ -186,15 +196,15 @@ def plot(errors):
     x = np.arange(1,len(errors)+1,1)
     y = errors
     plt.plot(x, y, color='r')
-    plt.title('error vs iter')
-    plt.xlabel('Number of iterations')
-    plt.ylabel('Avg Error')
+    plt.title('Avg Error vs epochs')
+    plt.xlabel('Number of epochs')
+    plt.ylabel('Avg Error--->')
     plt.show()
 
-features,labels = get_data("../train.csv")
+train_features,train_labels = get_data("../train.csv")
+test_features,test_labels = get_data("../test.csv")
 
 errors = []
-layers = train([25,10],100,features,labels,200,"sigmoid",1,"layers.pkl",errors)
-
+#layers = train([5,10],100,train_features,train_labels,test_features,test_labels,102,"sigmoid",1,"layers.pkl",errors,1)
 plot(errors)
 
